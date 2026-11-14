@@ -1,10 +1,17 @@
 import { Router } from 'express'
-import { apiResponse } from '../../utils/apiResponse.js'
+import { CreditsController } from './credits.controller.js'
+import { authenticate } from '../../middleware/authenticate.js'
 
 const router = Router()
 
-router.get('/status', (req, res) => {
-  return apiResponse.success(res, { module: 'credits', status: 'initialized' })
-})
+// Public pricing endpoint
+router.get('/pricing', CreditsController.getPricing)
+
+// Authenticated endpoints
+router.use(authenticate)
+
+router.get('/balance', CreditsController.getBalance)
+router.get('/transactions', CreditsController.getTransactions)
+router.post('/topup', CreditsController.createTopUpOrder)
 
 export default router

@@ -27,12 +27,13 @@ export class UsersController {
 
   static async changePassword(req, res, next) {
     try {
-      const { currPassword, newPassword } = req.body
+      const currPassword = req.body.currPassword || req.body.currentPassword
+      const newPassword = req.body.newPassword
       const result = await UsersService.changePassword(req.user.id, {
         currPassword,
         newPassword
       })
-      return apiResponse.success(res, result, 200)
+      return apiResponse.success(res, result, 200, { message: 'Password updated successfully' })
     } catch (error) {
       next(error)
     }

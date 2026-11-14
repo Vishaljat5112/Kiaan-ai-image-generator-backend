@@ -5,12 +5,37 @@ export const apiResponse = {
   /**
    * Formats a successful API response envelope.
    */
-  success: (res, data = {}, statusCode = 200, meta = {}) => {
+  success: (res, data = {}, statusCodeOrMessage = 200, meta = {}) => {
+    let statusCode = 200
+    let customMeta = { ...meta }
+
+    if (typeof statusCodeOrMessage === 'string') {
+      customMeta.message = statusCodeOrMessage
+      statusCode = 200
+    } else if (typeof statusCodeOrMessage === 'number') {
+      statusCode = statusCodeOrMessage
+    }
+
     return res.status(statusCode).json({
       success: true,
       data,
       meta: {
         timestamp: new Date().toISOString(),
+        ...customMeta
+      }
+    })
+  },
+
+  /**
+   * Formats a 201 Created API response envelope.
+   */
+  created: (res, data = {}, message = 'Resource created successfully', meta = {}) => {
+    return res.status(201).json({
+      success: true,
+      data,
+      meta: {
+        timestamp: new Date().toISOString(),
+        message,
         ...meta
       }
     })

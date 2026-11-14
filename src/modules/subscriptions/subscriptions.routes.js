@@ -1,11 +1,20 @@
 import { Router } from 'express'
-import { apiResponse } from '../../utils/apiResponse.js'
+import { SubscriptionsController } from './subscriptions.controller.js'
+import { authenticate } from '../../middleware/authenticate.js'
 
 const router = Router()
 
-router.get('/status', (req, res) => {
-  return apiResponse.success(res, { module: 'subscriptions', status: 'initialized' })
-})
+// Public plan catalog
+router.get('/plans', SubscriptionsController.listPlans)
+
+// Webhook listener
+router.post('/webhook', SubscriptionsController.handleWebhook)
+
+// Authenticated customer endpoints
+router.use(authenticate)
+
+router.get('/current', SubscriptionsController.getCurrentSubscription)
+router.post('/orders', SubscriptionsController.createOrder)
+router.get('/invoices', SubscriptionsController.listInvoices)
 
 export default router
-

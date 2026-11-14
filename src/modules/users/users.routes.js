@@ -10,6 +10,7 @@ router.use(authenticate)
 router.get('/profile', UsersController.getProfile)
 router.patch('/profile', UsersController.updateProfile)
 router.put('/password', UsersController.changePassword)
+router.post('/change-password', UsersController.changePassword)
 
 router.get('/preferences', UsersController.getPreferences)
 router.put('/preferences', UsersController.updatePreferences)
