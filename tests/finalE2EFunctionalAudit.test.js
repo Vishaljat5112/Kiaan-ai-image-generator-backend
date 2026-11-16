@@ -141,7 +141,7 @@ async function runAudit() {
     })
     const loginAdmin = await request('/auth/login', {
       method: 'POST',
-      body: { email: admin_Email, password }
+      body: { email: admin_Email, password, requestedAdmin: true }
     })
     admin_Token = loginAdmin.data.data.accessToken
     const authAdmin = { Authorization: `Bearer ${admin_Token}` }

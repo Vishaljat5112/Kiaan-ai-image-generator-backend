@@ -19,6 +19,7 @@ import generationRoutes from './modules/generation/generation.routes.js'
 import creditsRoutes from './modules/credits/credits.routes.js'
 import subscriptionsRoutes from './modules/subscriptions/subscriptions.routes.js'
 import supportRoutes from './modules/support/support.routes.js'
+import contactRoutes from './modules/contact/contact.routes.js'
 
 export const app = express()
 
@@ -90,6 +91,7 @@ app.use('/api/v1/generation', generationRoutes)
 app.use('/api/v1/credits', creditsRoutes)
 app.use('/api/v1/subscriptions', subscriptionsRoutes)
 app.use('/api/v1/support', supportRoutes)
+app.use('/api/v1/contact', contactRoutes)
 
 // 6. Catch-All & Error Handling
 app.use(notFoundHandler)

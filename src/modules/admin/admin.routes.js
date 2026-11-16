@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import { AdminController } from './admin.controller.js'
+import { ContactController } from '../contact/contact.controller.js'
 import { authenticate } from '../../middleware/authenticate.js'
 import { authorize } from '../../middleware/authorize.js'
 import { apiResponse } from '../../utils/apiResponse.js'
@@ -66,5 +67,10 @@ router.get('/audit-logs', AdminController.listAuditLogs)
 // 10. System Settings
 router.get('/settings', AdminController.getSystemSettings)
 router.put('/settings', AdminController.updateSystemSettings)
+
+// 11. Enterprise Architecture Inquiries
+router.get('/inquiries', ContactController.listInquiries)
+router.get('/inquiries/:id', ContactController.getInquiryById)
+router.patch('/inquiries/:id/status', ContactController.updateInquiryStatus)
 
 export default router
