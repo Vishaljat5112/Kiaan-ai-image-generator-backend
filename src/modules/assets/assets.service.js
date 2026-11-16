@@ -312,6 +312,33 @@ export class AssetsService {
       throw error
     }
 
+    const cleanPrompt = (asset.job?.prompt || 'asset')
+      .slice(0, 32)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+
+    // If asset is hosted remotely on Cloudinary or external CDN
+    if (asset.storagePath.startsWith('http://') || asset.storagePath.startsWith('https://')) {
+      let ext = asset.mediaType === 'VIDEO' ? '.mp4' : '.webp'
+      try {
+        const parsedUrl = new URL(asset.storagePath)
+        const urlExt = path.extname(parsedUrl.pathname)
+        if (urlExt) ext = urlExt
+      } catch {}
+
+      const downloadFilename = `${cleanPrompt || 'kiaan-studio-asset'}${ext}`
+
+      return {
+        asset,
+        isRemote: true,
+        downloadUrl: asset.storagePath,
+        filePath: null,
+        filename: downloadFilename,
+        format: (ext.replace('.', '') || (asset.mediaType === 'VIDEO' ? 'MP4' : 'WEBP')).toUpperCase()
+      }
+    }
+
     // Resolve file path safely and prevent directory traversal
     const candidatePaths = [
       path.resolve(process.cwd(), asset.storagePath.replace(/^\//, '')),
