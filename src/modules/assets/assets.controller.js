@@ -74,10 +74,30 @@ export class AssetsController {
   static async downloadAsset(req, res, next) {
     try {
       const { id } = req.params
-      const { asset, filePath, filename, format } = await AssetsService.getAssetFileForDownload(
+      const downloadInfo = await AssetsService.getAssetFileForDownload(
         req.user.id,
         id
       )
+
+      const { asset, filePath, filename, format, isRemote, downloadUrl } = downloadInfo
+
+      // If remote Cloudinary asset, record download and redirect directly to CDN URL
+      if (isRemote && downloadUrl) {
+        try {
+          const { prisma } = await import('../../config/database.js')
+          await prisma.downloadRecord.create({
+            data: {
+              userId: req.user.id,
+              assetId: asset.id,
+              format: format || 'WEBP'
+            }
+          })
+        } catch {
+          // Silently continue
+        }
+
+        return res.redirect(downloadUrl)
+      }
 
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
 
