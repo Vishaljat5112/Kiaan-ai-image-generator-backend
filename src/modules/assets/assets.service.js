@@ -362,11 +362,6 @@ export class AssetsService {
     }
 
     const ext = path.extname(resolvedPath) || (asset.mediaType === 'VIDEO' ? '.mp4' : '.jpg')
-    const cleanPrompt = (asset.job?.prompt || 'asset')
-      .slice(0, 32)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
     const downloadFilename = `${cleanPrompt || 'kiaan-studio-asset'}${ext}`
 
     return {
