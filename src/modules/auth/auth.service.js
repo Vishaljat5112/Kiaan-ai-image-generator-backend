@@ -120,11 +120,22 @@ export class AuthService {
       throw error
     }
 
-    // Admin authorization guard
-    if (requestedAdmin && user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
-      const error = new Error('Access denied: administrative privileges required')
+    // Strict Portal Authorization Guards
+    const isUserAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
+
+    // Rule 1: Admin portal requires administrator privileges
+    if (requestedAdmin && !isUserAdmin) {
+      const error = new Error('Access denied: Administrative privileges required. Please use User Login.')
       error.statusCode = 403
       error.code = 'FORBIDDEN'
+      throw error
+    }
+
+    // Rule 2: User portal requires customer credentials (admins must use Admin Login)
+    if (!requestedAdmin && isUserAdmin) {
+      const error = new Error('This account has administrator privileges. Please switch to Admin Login.')
+      error.statusCode = 403
+      error.code = 'ADMIN_REDIRECT_REQUIRED'
       throw error
     }
 
