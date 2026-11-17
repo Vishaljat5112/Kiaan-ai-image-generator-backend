@@ -355,6 +355,109 @@ export class AdminService {
     return user
   }
 
+  static async updateUser(actorId, userId, { fullName, role, status, creditDelta, reason }, ipAddress) {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { wallet: true }
+    })
+    if (!existingUser) {
+      throw new AppError('User not found', 404, 'USER_NOT_FOUND')
+    }
+
+    const dataToUpdate = {}
+    if (fullName !== undefined) {
+      dataToUpdate.fullName = fullName.trim()
+    }
+    if (role) {
+      if (role === 'SUPER_ADMIN' && existingUser.role !== 'SUPER_ADMIN') {
+        throw new AppError('Assigning SUPER_ADMIN role is currently disabled for security', 403, 'SUPER_ADMIN_DISABLED')
+      }
+      if (['CREATOR', 'ADMIN'].includes(role)) {
+        dataToUpdate.role = role
+      }
+    }
+    if (status && ['ACTIVE', 'SUSPENDED', 'BANNED'].includes(status)) {
+      if (existingUser.id === actorId && status !== 'ACTIVE') {
+        throw new AppError('Admins cannot suspend or ban their own account', 400, 'CANNOT_SUSPEND_SELF')
+      }
+      dataToUpdate.status = status
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: dataToUpdate
+    })
+
+    // Immediate token revocation for banned/suspended accounts
+    if (status === 'BANNED' || status === 'SUSPENDED') {
+      await prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() }
+      })
+    }
+
+    // Optional credit adjustment inside edit form
+    let newCreditBalance = existingUser.wallet?.balance ?? 0
+    if (creditDelta !== undefined && creditDelta !== '' && creditDelta !== null) {
+      const delta = parseInt(creditDelta, 10)
+      if (!isNaN(delta) && delta !== 0) {
+        let wallet = existingUser.wallet
+        if (!wallet) {
+          wallet = await prisma.creditWallet.create({
+            data: { userId, balance: 0 }
+          })
+        }
+        newCreditBalance = wallet.balance + delta
+        if (newCreditBalance < 0) {
+          throw new AppError(
+            `Credit deduction of ${Math.abs(delta)} exceeds current balance of ${wallet.balance}`,
+            400,
+            'INSUFFICIENT_CREDITS'
+          )
+        }
+        await prisma.creditWallet.update({
+          where: { userId },
+          data: { balance: newCreditBalance }
+        })
+        await prisma.creditTransaction.create({
+          data: {
+            walletId: wallet.id,
+            amount: Math.abs(delta),
+            type: delta > 0 ? 'CREDIT' : 'DEBIT',
+            category: 'ADMIN_GRANT',
+            description: reason || 'Administrative credit adjustment via Edit form'
+          }
+        })
+      }
+    }
+
+    await AuditService.log({
+      actorId,
+      action: 'USER_UPDATE',
+      targetEntity: 'USER',
+      targetId: userId,
+      ipAddress,
+      diffJson: {
+        previous: {
+          fullName: existingUser.fullName,
+          role: existingUser.role,
+          status: existingUser.status,
+          creditBalance: existingUser.wallet?.balance ?? 0
+        },
+        updated: {
+          ...dataToUpdate,
+          ...(creditDelta ? { creditBalance: newCreditBalance } : {})
+        },
+        reason: reason || 'Administrative user profile update'
+      }
+    })
+
+    return {
+      ...updated,
+      creditBalance: newCreditBalance
+    }
+  }
+
   static async updateUserStatus(actorId, userId, { status, reason }, ipAddress) {
     if (!['ACTIVE', 'SUSPENDED', 'BANNED'].includes(status)) {
       throw new AppError('Invalid user status', 400, 'INVALID_STATUS')
@@ -398,6 +501,10 @@ export class AdminService {
     const existingUser = await prisma.user.findUnique({ where: { id: userId } })
     if (!existingUser) {
       throw new AppError('User not found', 404, 'USER_NOT_FOUND')
+    }
+
+    if (role === 'SUPER_ADMIN' && existingUser.role !== 'SUPER_ADMIN') {
+      throw new AppError('Assigning SUPER_ADMIN role is currently disabled for security', 403, 'SUPER_ADMIN_DISABLED')
     }
 
     const updated = await prisma.user.update({

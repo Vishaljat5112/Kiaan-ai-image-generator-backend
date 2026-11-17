@@ -42,6 +42,20 @@ export class AdminController {
     }
   }
 
+  static async updateUser(req, res, next) {
+    try {
+      const user = await AdminService.updateUser(
+        req.user.id,
+        req.params.id,
+        req.body,
+        req.ip
+      )
+      return apiResponse.success(res, user, 'User updated successfully')
+    } catch (error) {
+      next(error)
+    }
+  }
+
   static async updateUserStatus(req, res, next) {
     try {
       const user = await AdminService.updateUserStatus(

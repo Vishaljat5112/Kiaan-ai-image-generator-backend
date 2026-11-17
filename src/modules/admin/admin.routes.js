@@ -24,6 +24,7 @@ router.get('/analytics', AdminController.getAnalytics)
 // 2. User Management
 router.get('/users', AdminController.listUsers)
 router.get('/users/:id', AdminController.getUserDetails)
+router.patch('/users/:id', AdminController.updateUser)
 router.patch('/users/:id/status', AdminController.updateUserStatus)
 router.patch('/users/:id/role', AdminController.updateUserRole)
 router.post('/users/:id/credits', AdminController.adjustUserCredits)
