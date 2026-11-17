@@ -501,14 +501,30 @@ export class AdminService {
     const skip = (pageNum - 1) * limitNum
 
     const where = {}
-    if (type) where.type = type
-    if (status) where.status = status
-    if (modelId) where.modelId = modelId
-    if (search) {
+    if (type && type !== 'all') {
+      const upperType = String(type).toUpperCase()
+      if (upperType === 'IMAGE') {
+        where.type = { in: ['TEXT_TO_IMAGE', 'IMAGE_TO_IMAGE', 'IMAGE_EDITOR'] }
+      } else if (upperType === 'VIDEO') {
+        where.type = { in: ['TEXT_TO_VIDEO', 'IMAGE_TO_VIDEO'] }
+      } else if (upperType.includes(',')) {
+        where.type = { in: upperType.split(',').map((t) => t.trim()) }
+      } else {
+        where.type = upperType
+      }
+    }
+    if (status && status !== 'all') {
+      where.status = String(status).toUpperCase()
+    }
+    if (modelId && modelId !== 'all') {
+      where.modelId = modelId
+    }
+    if (search && String(search).trim()) {
+      const q = String(search).trim()
       where.OR = [
-        { id: { contains: search } },
-        { prompt: { contains: search } },
-        { user: { email: { contains: search } } }
+        { id: { contains: q } },
+        { prompt: { contains: q } },
+        { user: { email: { contains: q } } }
       ]
     }
 
@@ -524,14 +540,52 @@ export class AdminService {
             select: { id: true, email: true, fullName: true }
           },
           assets: {
-            select: { id: true, mediaType: true, storagePath: true, width: true, height: true }
+            select: {
+              id: true,
+              mediaType: true,
+              storagePath: true,
+              thumbnailPath: true,
+              dimensions: true,
+              fileSizeBytes: true,
+              createdAt: true
+            }
           }
         }
       })
     ])
 
+    const formattedJobs = jobs.map((job) => {
+      const assets = (job.assets || []).map((asset) => {
+        let width = 1024
+        let height = 1024
+        if (asset.dimensions && typeof asset.dimensions === 'string') {
+          const parts = asset.dimensions.toLowerCase().split('x')
+          if (parts.length === 2) {
+            width = parseInt(parts[0], 10) || 1024
+            height = parseInt(parts[1], 10) || 1024
+          }
+        }
+        return {
+          id: asset.id,
+          mediaType: asset.mediaType,
+          storagePath: asset.storagePath,
+          thumbnailPath: asset.thumbnailPath || asset.storagePath,
+          dimensions: asset.dimensions || `${width}x${height}`,
+          width,
+          height,
+          fileSizeBytes: asset.fileSizeBytes ? Number(asset.fileSizeBytes) : 0,
+          createdAt: asset.createdAt
+        }
+      })
+
+      return {
+        ...job,
+        assets
+      }
+    })
+
     return {
-      jobs,
+      jobs: formattedJobs,
       pagination: {
         total,
         page: pageNum,
@@ -598,7 +652,8 @@ export class AdminService {
         where: { id: jobId },
         data: {
           status: 'CANCELED',
-          errorMessage: reason || 'Canceled by platform administrator'
+          errorMessage: reason || 'Canceled by platform administrator',
+          completedAt: new Date()
         }
       })
 
@@ -657,10 +712,10 @@ export class AdminService {
       where: { id: jobId },
       data: {
         status: 'QUEUED',
-        progress: 0,
         errorMessage: null,
-        startedAt: null,
-        completedAt: null
+        completedAt: null,
+        executionTimeMs: null,
+        workerNodeId: null
       }
     })
 
@@ -1131,10 +1186,15 @@ export class AdminService {
     })
 
     // Defaults for standard platform settings
+    const resolvedDefaultCredits =
+      settingsMap.defaultFreeCredits !== undefined && settingsMap.defaultFreeCredits !== null
+        ? Number(settingsMap.defaultFreeCredits)
+        : 50
+
     return {
       maintenanceMode: settingsMap.maintenanceMode || false,
       allowRegistration: settingsMap.allowRegistration !== false,
-      defaultFreeCredits: settingsMap.defaultFreeCredits || 50,
+      defaultFreeCredits: !isNaN(resolvedDefaultCredits) ? resolvedDefaultCredits : 50,
       maxConcurrentJobsPerUser: settingsMap.maxConcurrentJobsPerUser || 2,
       workerHeartbeatTimeoutSec: settingsMap.workerHeartbeatTimeoutSec || 300,
       systemNotice: settingsMap.systemNotice || '',
@@ -1145,6 +1205,13 @@ export class AdminService {
   static async updateSystemSettings(actorId, newSettings, ipAddress) {
     if (typeof newSettings !== 'object' || newSettings === null) {
       throw new AppError('Invalid settings object', 400, 'INVALID_SETTINGS')
+    }
+
+    if (newSettings.defaultFreeCredits !== undefined) {
+      const num = Number(newSettings.defaultFreeCredits)
+      if (isNaN(num) || num < 0 || !Number.isInteger(num)) {
+        throw new AppError('Starter credits must be a valid non-negative integer', 400, 'INVALID_SETTINGS')
+      }
     }
 
     const previous = await this.getSystemSettings()

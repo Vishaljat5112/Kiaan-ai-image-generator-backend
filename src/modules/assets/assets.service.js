@@ -325,7 +325,7 @@ export class AssetsService {
         const parsedUrl = new URL(asset.storagePath)
         const urlExt = path.extname(parsedUrl.pathname)
         if (urlExt) ext = urlExt
-      } catch {}
+      } catch { }
 
       const downloadFilename = `${cleanPrompt || 'kiaan-studio-asset'}${ext}`
 

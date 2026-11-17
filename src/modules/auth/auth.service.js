@@ -31,8 +31,33 @@ export class AuthService {
 
     const passwordHash = await hashPassword(password)
 
-    // Atomic transaction: create User and initial CreditWallet
+    // Atomic transaction: create User, dynamic CreditWallet, and starter credit transaction
     const result = await prisma.$transaction(async (tx) => {
+      // 1. Fetch dynamic starter credits from system settings
+      let starterCredits = 50 // Safe platform fallback if setting does not exist
+      const settingRecord = await tx.systemSetting.findUnique({
+        where: { key: 'defaultFreeCredits' }
+      })
+
+      if (settingRecord && settingRecord.value !== undefined && settingRecord.value !== null) {
+        let parsedNum = NaN
+        try {
+          const parsedJson = JSON.parse(settingRecord.value)
+          if (typeof parsedJson === 'number') {
+            parsedNum = parsedJson
+          }
+        } catch {}
+
+        if (isNaN(parsedNum)) {
+          parsedNum = parseInt(settingRecord.value, 10)
+        }
+
+        if (!isNaN(parsedNum) && parsedNum >= 0) {
+          starterCredits = Math.floor(parsedNum)
+        }
+      }
+
+      // 2. Create customer User
       const user = await tx.user.create({
         data: {
           email: normalizedEmail,
@@ -43,12 +68,23 @@ export class AuthService {
         }
       })
 
-      // Grant initial 25 free welcome credits in wallet
+      // 3. Grant dynamic starter credits in credit wallet
       const wallet = await tx.creditWallet.create({
         data: {
           userId: user.id,
-          balance: 25,
+          balance: starterCredits,
           reservedBalance: 0
+        }
+      })
+
+      // 4. Create initial credit ledger entry using the same amount
+      await tx.creditTransaction.create({
+        data: {
+          walletId: wallet.id,
+          amount: starterCredits,
+          type: 'CREDIT',
+          category: 'ADMIN_GRANT',
+          description: 'Welcome starter credits'
         }
       })
 
