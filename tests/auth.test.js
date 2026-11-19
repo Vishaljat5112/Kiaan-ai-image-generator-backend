@@ -99,8 +99,8 @@ async function runAuthTests() {
       '4. Passwords are securely hashed with bcrypt in MySQL'
     )
     assert(
-      dbCustomer.wallet && dbCustomer.wallet.balance === 25,
-      '4a. CreditWallet automatically created with initial 25 welcome bonus'
+      dbCustomer.wallet && dbCustomer.wallet.balance === 50,
+      '4a. CreditWallet automatically created with initial 50 welcome credits'
     )
 
     // -----------------------------------------------------------------
@@ -202,18 +202,44 @@ async function runAuthTests() {
     })
     createdUserIds.push(adminPasswordHash.id)
 
+    // 12a. Portal separation: Admin attempting to login via customer portal is redirected
+    const adminCustomerPortalLogin = await request('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: adminEmail, password: rawPassword, requestedAdmin: false })
+    })
+    assert(
+      adminCustomerPortalLogin.status === 403 && adminCustomerPortalLogin.data?.error?.code === 'ADMIN_REDIRECT_REQUIRED',
+      '12a. Admin attempting to login via customer portal receives 403 ADMIN_REDIRECT_REQUIRED'
+    )
+
+    // 12b. Authorized Administrator login via admin portal
     const adminLoginRes = await request('/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: adminEmail, password: rawPassword })
+      body: JSON.stringify({ email: adminEmail, password: rawPassword, requestedAdmin: true })
     })
-    const adminToken = adminLoginRes.data.data.accessToken
+    assert(
+      adminLoginRes.status === 200 && adminLoginRes.data?.success,
+      '12b. Authorized Administrator logs in via admin portal with 200 OK'
+    )
+    const adminToken = adminLoginRes.data?.data?.accessToken
 
+    // 12c. Authorized Administrator accesses admin dashboard
     const adminAllowed = await request('/v1/admin/dashboard', {
       headers: { Authorization: `Bearer ${adminToken}` }
     })
     assert(
-      adminAllowed.status === 200 && adminAllowed.data.success,
-      '12. Authorized Administrator accesses admin routes with 200 OK'
+      adminAllowed.status === 200 && adminAllowed.data?.success,
+      '12c. Authorized Administrator accesses admin routes with 200 OK'
+    )
+
+    // 12d. Customer attempting to access admin login portal is forbidden
+    const customerAdminPortalLogin = await request('/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: customerEmail, password: rawPassword, requestedAdmin: true })
+    })
+    assert(
+      customerAdminPortalLogin.status === 403 && customerAdminPortalLogin.data?.error?.code === 'FORBIDDEN',
+      '12d. Customer attempting to login via admin portal is rejected with 403 FORBIDDEN'
     )
 
     // -----------------------------------------------------------------
@@ -314,6 +340,81 @@ async function runAuthTests() {
     assert(
       bannedLogin.status === 403 && bannedLogin.data.error.code === 'ACCOUNT_BANNED',
       '17. Banned user is blocked from logging in with 403 Account Banned'
+    )
+
+    // -----------------------------------------------------------------
+    // 18. lastLoginAt Persistence Verification
+    // -----------------------------------------------------------------
+    const customerDbAfterLogin = await prisma.user.findUnique({
+      where: { id: customerUserId }
+    })
+    const adminDbAfterLogin = await prisma.user.findUnique({
+      where: { id: adminPasswordHash.id }
+    })
+    assert(
+      customerDbAfterLogin.lastLoginAt instanceof Date &&
+      adminDbAfterLogin.lastLoginAt instanceof Date,
+      '18. lastLoginAt is persisted in MySQL for both customer and admin logins'
+    )
+
+    // -----------------------------------------------------------------
+    // 19. Audit Log Persistence Verification (USER_LOGIN & ADMIN_LOGIN)
+    // -----------------------------------------------------------------
+    const customerAudit = await prisma.auditLog.findFirst({
+      where: { actorId: customerUserId, action: 'USER_LOGIN' }
+    })
+    const adminAudit = await prisma.auditLog.findFirst({
+      where: { actorId: adminPasswordHash.id, action: 'ADMIN_LOGIN' }
+    })
+    assert(
+      customerAudit &&
+      customerAudit.targetEntity === 'AUTH' &&
+      adminAudit &&
+      adminAudit.targetEntity === 'AUTH',
+      '19. Login audit events recorded in audit_logs for user and admin accounts'
+    )
+    assert(
+      !JSON.stringify(customerAudit.diffJson).includes('password') &&
+      !JSON.stringify(customerAudit.diffJson).includes('token'),
+      '19a. Audit logs strictly exclude passwords, tokens, and hashes'
+    )
+
+    // -----------------------------------------------------------------
+    // 19b. Audit IP Anti-Spoofing Verification
+    // -----------------------------------------------------------------
+    const forgedIp = '203.0.113.199'
+    const spoofLoginRes = await request('/v1/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Forwarded-For': `${forgedIp}, 198.51.100.1`
+      },
+      body: JSON.stringify({ email: customerEmail, password: rawPassword })
+    })
+    assert(
+      spoofLoginRes.status === 200,
+      '19b. Successful login with forged header returns 200'
+    )
+    const latestCustomerAudit = await prisma.auditLog.findFirst({
+      where: { actorId: customerUserId, action: 'USER_LOGIN' },
+      orderBy: { createdAt: 'desc' }
+    })
+    assert(
+      latestCustomerAudit &&
+      latestCustomerAudit.ipAddress !== forgedIp &&
+      !latestCustomerAudit.ipAddress?.includes(forgedIp),
+      '19c. Forged X-Forwarded-For header cannot spoof the stored login audit IP'
+    )
+
+    // -----------------------------------------------------------------
+    // 20. Mock Authentication Token Rejection
+    // -----------------------------------------------------------------
+    const mockTokenRes = await request('/v1/auth/me', {
+      headers: { Authorization: 'Bearer mock_preview_token' }
+    })
+    assert(
+      mockTokenRes.status === 401 && mockTokenRes.data.error.code === 'INVALID_TOKEN',
+      '20. Backend rejects offline mock tokens (mock_preview_token) with 401'
     )
 
     console.log(`\n====================================================`)

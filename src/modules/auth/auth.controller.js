@@ -44,10 +44,15 @@ export class AuthController {
   static async login(req, res, next) {
     try {
       const { email, password, requestedAdmin } = req.body
+      const clientIp = req.ip || req.socket?.remoteAddress || null
+      const userAgent = req.headers['user-agent'] || null
+
       const result = await AuthService.loginUser({
         email,
         password,
-        requestedAdmin: Boolean(requestedAdmin)
+        requestedAdmin: Boolean(requestedAdmin),
+        clientIp,
+        userAgent
       })
 
       res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getCookieOptions())

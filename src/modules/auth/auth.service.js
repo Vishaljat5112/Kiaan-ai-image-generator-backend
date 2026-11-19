@@ -1,4 +1,6 @@
 import { prisma } from '../../config/database.js'
+import { AuditService } from '../admin/audit.service.js'
+import { logger } from '../../utils/logger.js'
 import {
   hashPassword,
   comparePassword,
@@ -117,7 +119,7 @@ export class AuthService {
   /**
    * Authenticates user credentials (Customer or Admin)
    */
-  static async loginUser({ email, password, requestedAdmin = false }) {
+  static async loginUser({ email, password, requestedAdmin = false, clientIp = null, userAgent = null }) {
     const normalizedEmail = normalizeEmail(email)
 
     const user = await prisma.user.findUnique({
@@ -174,6 +176,31 @@ export class AuthService {
       error.code = 'ADMIN_REDIRECT_REQUIRED'
       throw error
     }
+
+    // Task A: Update lastLoginAt timestamp after all security checks pass
+    const loginTimestamp = new Date()
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: loginTimestamp }
+    })
+    user.lastLoginAt = loginTimestamp
+
+    // Task B: Record successful login audit event (safe, non-blocking)
+    AuditService.log({
+      actorId: user.id,
+      action: isUserAdmin ? 'ADMIN_LOGIN' : 'USER_LOGIN',
+      targetEntity: 'AUTH',
+      targetId: user.id,
+      ipAddress: clientIp ? String(clientIp).slice(0, 45) : null,
+      diffJson: {
+        role: user.role,
+        portal: requestedAdmin ? 'ADMIN' : 'CUSTOMER',
+        authMethod: 'PASSWORD_BCRYPT',
+        ...(userAgent ? { userAgent: String(userAgent).slice(0, 255) } : {})
+      }
+    }).catch(err => {
+      logger.error('Failed to record login audit log:', err)
+    })
 
     // Generate session tokens
     const accessToken = generateAccessToken(user)
