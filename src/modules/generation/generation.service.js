@@ -89,6 +89,16 @@ export class GenerationService {
       throw error
     }
 
+    // Fail-closed server-side worker readiness guard:
+    // Prevents chargeable generation submissions and credit reservations while GPU inference worker is offline.
+    const isWorkerReady = process.env.ENABLE_AI_WORKER === 'true'
+    if (!isWorkerReady) {
+      const error = new Error('AI inference service is currently offline. New generation submissions are temporarily suspended to protect your credits.')
+      error.statusCode = 503
+      error.code = 'WORKER_UNAVAILABLE'
+      throw error
+    }
+
     // Check concurrency limit against active subscription
     const sub = await prisma.subscription.findFirst({
       where: { userId, status: 'ACTIVE' },
