@@ -12,7 +12,8 @@
     "seed:admin": "node scripts/seedAdmin.js",
     "seed:demo": "node scripts/seedDemoUsers.js",
     "test": "node tests/verifyServer.js",
-    "test:auth": "node tests/auth.test.js"
+    "test:auth": "node tests/auth.test.js",
+    "test:credits": "node tests/creditsUsage.test.js"
   },
   "keywords": [
     "ai",

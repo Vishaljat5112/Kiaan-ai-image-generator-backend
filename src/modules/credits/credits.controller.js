@@ -11,6 +11,16 @@ export class CreditsController {
     }
   }
 
+  static async getUsageHistory(req, res, next) {
+    try {
+      const { days } = req.query
+      const result = await CreditsService.getUsageHistory(req.user.id, { days })
+      return apiResponse.success(res, result, 200)
+    } catch (error) {
+      next(error)
+    }
+  }
+
   static async getPricing(req, res, next) {
     try {
       const pricing = CreditsService.getPricing()

@@ -259,6 +259,90 @@ export class CreditsService {
   }
 
   /**
+   * Get chronological daily credit usage history for the authenticated user
+   * @param {string} userId
+   * @param {object} [options]
+   * @param {number|string} [options.days=14]
+   */
+  static async getUsageHistory(userId, { days = 14 } = {}) {
+    const parsedDays = parseInt(days, 10)
+    if (isNaN(parsedDays) || parsedDays < 1 || parsedDays > 90) {
+      const error = new Error('Days parameter must be an integer between 1 and 90')
+      error.statusCode = 400
+      error.code = 'INVALID_PARAMETER'
+      throw error
+    }
+
+    // Initialize chronological series of date buckets ending today (UTC)
+    const now = new Date()
+    const usageSeries = []
+    const dateBuckets = new Map()
+
+    for (let i = parsedDays - 1; i >= 0; i--) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i))
+      const dateStr = d.toISOString().split('T')[0] // 'YYYY-MM-DD'
+      const dayLabel = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }) // e.g. '19 Nov'
+      const bucket = {
+        date: dateStr,
+        day: dayLabel,
+        image: 0,
+        video: 0,
+        total: 0
+      }
+      usageSeries.push(bucket)
+      dateBuckets.set(dateStr, bucket)
+    }
+
+    const wallet = await prisma.creditWallet.findUnique({
+      where: { userId }
+    })
+
+    if (!wallet) {
+      return {
+        days: parsedDays,
+        startDate: usageSeries[0]?.date,
+        endDate: usageSeries[usageSeries.length - 1]?.date,
+        usage: usageSeries
+      }
+    }
+
+    const startDate = new Date(usageSeries[0].date + 'T00:00:00.000Z')
+
+    // Legitimate credit-consumption transactions are strictly DEBIT type
+    const debitTransactions = await prisma.creditTransaction.findMany({
+      where: {
+        walletId: wallet.id,
+        type: 'DEBIT',
+        createdAt: { gte: startDate }
+      },
+      orderBy: { createdAt: 'asc' }
+    })
+
+    for (const tx of debitTransactions) {
+      const txDateStr = tx.createdAt.toISOString().split('T')[0]
+      const bucket = dateBuckets.get(txDateStr)
+      if (bucket) {
+        const cost = Math.abs(tx.amount)
+        if (tx.category === 'IMAGE_GENERATION') {
+          bucket.image += cost
+        } else if (tx.category === 'VIDEO_GENERATION') {
+          bucket.video += cost
+        } else {
+          bucket.image += cost
+        }
+        bucket.total += cost
+      }
+    }
+
+    return {
+      days: parsedDays,
+      startDate: usageSeries[0]?.date,
+      endDate: usageSeries[usageSeries.length - 1]?.date,
+      usage: usageSeries
+    }
+  }
+
+  /**
    * Initiates a credit top-up order / invoice
    */
   static async createTopUpOrder(userId, { packId }) {

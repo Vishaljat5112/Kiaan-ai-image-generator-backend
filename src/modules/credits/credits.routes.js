@@ -11,6 +11,7 @@ router.get('/pricing', CreditsController.getPricing)
 router.use(authenticate)
 
 router.get('/balance', CreditsController.getBalance)
+router.get('/usage-history', CreditsController.getUsageHistory)
 router.get('/transactions', CreditsController.getTransactions)
 router.post('/topup', CreditsController.createTopUpOrder)
 
