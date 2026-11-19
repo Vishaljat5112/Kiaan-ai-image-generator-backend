@@ -146,21 +146,31 @@ export class ContactService {
       ]
     }
 
+    const inquiryDelegate = prisma.enterpriseInquiry || prisma.EnterpriseInquiry
+
+    if (!inquiryDelegate || typeof inquiryDelegate.findMany !== 'function') {
+      return {
+        inquiries: [],
+        counts: { total: 0, new: 0, contacted: 0, closed: 0 },
+        pagination: { total: 0, page, limit, totalPages: 1 }
+      }
+    }
+
     const [inquiries, total] = await Promise.all([
-      prisma.enterpriseInquiry.findMany({
+      inquiryDelegate.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' }
       }),
-      prisma.enterpriseInquiry.count({ where })
+      inquiryDelegate.count({ where })
     ])
 
     // Compute status counts for admin KPI badges
     const [newCount, contactedCount, closedCount] = await Promise.all([
-      prisma.enterpriseInquiry.count({ where: { status: 'NEW' } }),
-      prisma.enterpriseInquiry.count({ where: { status: 'CONTACTED' } }),
-      prisma.enterpriseInquiry.count({ where: { status: 'CLOSED' } })
+      inquiryDelegate.count({ where: { status: 'NEW' } }),
+      inquiryDelegate.count({ where: { status: 'CONTACTED' } }),
+      inquiryDelegate.count({ where: { status: 'CLOSED' } })
     ])
 
     return {
@@ -184,7 +194,11 @@ export class ContactService {
    * Admin: Get full details of a specific consultation inquiry.
    */
   static async getInquiryById(id) {
-    const inquiry = await prisma.enterpriseInquiry.findUnique({
+    const inquiryDelegate = prisma.enterpriseInquiry || prisma.EnterpriseInquiry
+    if (!inquiryDelegate) {
+      throw new AppError('Consultation inquiry not found.', 404, 'INQUIRY_NOT_FOUND')
+    }
+    const inquiry = await inquiryDelegate.findUnique({
       where: { id }
     })
     if (!inquiry) {
@@ -202,14 +216,19 @@ export class ContactService {
       throw new AppError('Invalid status. Allowed values: NEW, CONTACTED, CLOSED.', 400, 'INVALID_STATUS')
     }
 
-    const existing = await prisma.enterpriseInquiry.findUnique({
+    const inquiryDelegate = prisma.enterpriseInquiry || prisma.EnterpriseInquiry
+    if (!inquiryDelegate) {
+      throw new AppError('Consultation inquiry not found.', 404, 'INQUIRY_NOT_FOUND')
+    }
+
+    const existing = await inquiryDelegate.findUnique({
       where: { id }
     })
     if (!existing) {
       throw new AppError('Consultation inquiry not found.', 404, 'INQUIRY_NOT_FOUND')
     }
 
-    const updated = await prisma.enterpriseInquiry.update({
+    const updated = await inquiryDelegate.update({
       where: { id },
       data: {
         status: status.toUpperCase(),
