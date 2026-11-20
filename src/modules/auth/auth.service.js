@@ -177,14 +177,6 @@ export class AuthService {
       throw error
     }
 
-    // Task A: Update lastLoginAt timestamp after all security checks pass
-    const loginTimestamp = new Date()
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: loginTimestamp }
-    })
-    user.lastLoginAt = loginTimestamp
-
     // Task B: Record successful login audit event (safe, non-blocking)
     AuditService.log({
       actorId: user.id,

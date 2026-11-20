@@ -2,6 +2,7 @@ import { app } from './app.js'
 import { env } from './config/env.js'
 import { logger } from './utils/logger.js'
 import { prisma } from './config/database.js'
+import { CloudflareWorkerDaemon } from './modules/generation/cloudflareWorker.js'
 
 const server = app.listen(env.PORT, () => {
   logger.info(`====================================================`)
@@ -11,12 +12,18 @@ const server = app.listen(env.PORT, () => {
   logger.info(` Health Check: http://localhost:${env.PORT}/api/health`)
   logger.info(` API Base    : http://localhost:${env.PORT}/api/v1`)
   logger.info(` Frontend    : ${env.FRONTEND_URL}`)
+  logger.info(` AI Worker   : ${env.ENABLE_AI_WORKER ? 'ACTIVE (Cloudflare AI Daemon)' : 'OFFLINE'}`)
   logger.info(`====================================================`)
+
+  if (env.ENABLE_AI_WORKER) {
+    CloudflareWorkerDaemon.startWorkerDaemon({ intervalMs: 2000 })
+  }
 })
 
 // Graceful shutdown handling
 const handleGracefulShutdown = async (signal) => {
   logger.info(`Received ${signal}. Gracefully shutting down HTTP server...`)
+  CloudflareWorkerDaemon.stopWorkerDaemon()
   server.close(async () => {
     logger.info('HTTP server closed.')
     try {
