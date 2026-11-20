@@ -33,6 +33,7 @@ function validateEnv() {
     JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
     JWT_REFRESH_EXPIRES_IN: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
     WORKER_SECRET: process.env.WORKER_SECRET || 'kiaan_worker_secret_dev_2026',
+    WAVESPEED_API_KEY: process.env.WAVESPEED_API_KEY,
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
