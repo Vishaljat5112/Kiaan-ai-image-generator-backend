@@ -4,10 +4,12 @@ import { apiResponse } from '../../utils/apiResponse.js'
 export class AssetsController {
   static async listAssets(req, res, next) {
     try {
-      const { search, type, favorite, isFavorite, projectId, sort, page, limit } = req.query
+      const { search, type, generationType, jobType, favorite, isFavorite, projectId, sort, page, limit } = req.query
       const result = await AssetsService.listAssets(req.user.id, {
         search,
         type,
+        generationType,
+        jobType,
         favorite,
         isFavorite,
         projectId,

@@ -54,6 +54,11 @@ export class CloudflareAiService {
    */
   static parseDimensions(aspect = '1:1', rawWidth = null, rawHeight = null) {
     const cleanAspect = String(aspect || '1:1').trim()
+    const ratioMatch = cleanAspect.match(/(\d+)\s*:\s*(\d+)/)
+    const ratioKey = ratioMatch ? `${ratioMatch[1]}:${ratioMatch[2]}` : cleanAspect
+    if (ASPECT_RATIO_MAP[ratioKey]) {
+      return ASPECT_RATIO_MAP[ratioKey]
+    }
     if (ASPECT_RATIO_MAP[cleanAspect]) {
       return ASPECT_RATIO_MAP[cleanAspect]
     }

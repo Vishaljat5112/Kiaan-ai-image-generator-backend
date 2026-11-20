@@ -53,12 +53,14 @@ export class AssetsService {
       type: asset.mediaType.toLowerCase(), // 'image' | 'video'
       mediaType: asset.mediaType,
       tool: formatToolName(job.type),
+      generationType: job.type || null,
+      jobType: job.type || null,
       title,
       prompt: job.prompt || '',
       negativePrompt: job.negativePrompt || '',
       model: job.modelId || 'FLUX.2 Klein 4B',
       dimensions: asset.dimensions || '1024x1024',
-      aspect: params.aspect || '1:1',
+      aspect: params.aspect || params.aspectRatio || '1:1',
       seed: params.seed ? String(params.seed) : '482910385',
       steps: params.steps || 4,
       cfg: params.cfg || 3.5,
@@ -77,7 +79,7 @@ export class AssetsService {
   /**
    * List assets belonging to the user with search, filtering, and sorting
    */
-  static async listAssets(userId, { search, type, favorite, isFavorite, projectId, sort = 'newest', page = 1, limit = 50 } = {}) {
+  static async listAssets(userId, { search, type, generationType, jobType, favorite, isFavorite, projectId, sort = 'newest', page = 1, limit = 50 } = {}) {
     const pageNum = Math.max(1, parseInt(page, 10) || 1)
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50))
     const skip = (pageNum - 1) * limitNum
@@ -114,6 +116,16 @@ export class AssetsService {
           { prompt: { contains: q } },
           { modelId: { contains: q } }
         ]
+      }
+    }
+
+    // Filter by generation workflow type (e.g. TEXT_TO_IMAGE, TEXT_TO_VIDEO, IMAGE_TO_IMAGE, IMAGE_TO_VIDEO)
+    const genType = (generationType || jobType || '').toUpperCase().replace(/-/g, '_')
+    if (genType && genType !== 'ALL') {
+      if (!where.job) {
+        where.job = { type: genType }
+      } else {
+        where.job.type = genType
       }
     }
 
