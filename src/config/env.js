@@ -36,6 +36,10 @@ function validateEnv() {
     CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY || '',
     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET || '',
+    ENABLE_AI_WORKER: process.env.ENABLE_AI_WORKER === 'true',
+    CLOUDFLARE_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID || '',
+    CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN || '',
+    CLOUDFLARE_INFERENCE_MODE: process.env.CLOUDFLARE_INFERENCE_MODE || 'live',
     isProduction: process.env.NODE_ENV === 'production',
     isDevelopment: process.env.NODE_ENV !== 'production'
   }

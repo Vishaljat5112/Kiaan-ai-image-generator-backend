@@ -36,7 +36,6 @@ model User {
   status       UserStatus   @default(ACTIVE)
   avatarUrl    String?      @db.VarChar(512)
   bio          String?      @db.Text
-  lastLoginAt  DateTime?    @db.DateTime(3)
   createdAt    DateTime     @default(now()) @db.DateTime(3)
   updatedAt    DateTime     @updatedAt @db.DateTime(3)
 

@@ -4,6 +4,7 @@ import { prisma } from '../../config/database.js'
 export const CREDIT_PRICING = {
   MODELS: {
     'flux-2-klein-4b': { name: 'FLUX.2 Klein 4B', type: 'IMAGE', baseCost: 1 },
+    'flux-1-schnell': { name: 'FLUX.1 Schnell', type: 'IMAGE', baseCost: 1 },
     'z-image-turbo': { name: 'Z-Image Turbo', type: 'IMAGE', baseCost: 1 },
     'wan-2.1-video-720p': { name: 'Wan 2.1 Video (Cinema 720p)', type: 'VIDEO', baseCost: 25 },
     'wan-2.1-i2v-14b': { name: 'Wan 2.1 I2V 14B Cinema', type: 'VIDEO', baseCost: 20 }
